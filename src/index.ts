@@ -11,13 +11,16 @@ const DbInputSchema = z.object({
   query: z.string(),
 });
 
+import { generate } from "@genkit-ai/ai";
+import { geminiPro } from "@genkit-ai/googleai";
+
 // Define the PostgreSQL flow
 export const postgresFlow = (ai: any) =>
   ai.defineFlow(
     {
       name: "postgresFlow",
       inputSchema: DbInputSchema,
-      outputSchema: z.any(),
+      outputSchema: z.string(),
     },
     async (input: any) => {
       const client = new Client({
@@ -28,12 +31,20 @@ export const postgresFlow = (ai: any) =>
         port: input.port,
       });
 
+      let dbResult;
       try {
         await client.connect();
         const res = await client.query(input.query);
-        return res.rows;
+        dbResult = res.rows;
       } finally {
         await client.end();
       }
+
+      const llmResponse = await generate({
+        model: geminiPro,
+        prompt: `Summarize the following data: ${JSON.stringify(dbResult)}`,
+      });
+
+      return llmResponse.text();
     }
   );
